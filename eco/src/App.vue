@@ -36,6 +36,7 @@
           />
 
           <div id="zonaAnalisis" :style="[offsetZonaAnalisis]">
+            <img class="simboloLoading" src="@/assets/loading.png" v-show="enviandoEco">
             <div id="controlesZonaAnalisis" v-show="respuestaRecibida">
               <div class="bloqueControl">
                 <label for="showContornoEco" class="labelCheckbox">Contorno</label><input class="checkControlAnalisis" type="checkbox" name="showContornoEco" id="showContornoEco" v-model="showContornoEco"> 
@@ -112,7 +113,7 @@
           </div>
         </div>
         <br><br>
-      <button v-show="imagenSelected" @click="uploadEcografia" ref="botonEnviarEco" id="botonEnviarEco">Analizar</button>
+      <button v-show="imagenSelected" @click="uploadEcografia" ref="botonEnviarEco" id="botonEnviarEco" :class="{deshabilitado:enviandoEco}">Analizar</button>
 
       </center>
 
@@ -172,7 +173,8 @@ export default {
       lapiz.clearRect(0,0, canvas.width, canvas.height);
     },
     iniciarResize(agarradero) {
-      this.vaciarAnalisis()      
+      this.vaciarAnalisis();
+      this.respuestaRecibida=false;
       this.resizingZonaAnalisis.fill(false);
       this.resizingZonaAnalisis.splice(agarradero, 1, true);
     },
@@ -278,6 +280,7 @@ export default {
       }
     },
     uploadEcografia() {
+      if(this.enviandoEco)return;
       const inputEco = document.getElementById("inputEcografia");
       var datos = new FormData();
       const eco = inputEco.files[0];
@@ -523,6 +526,10 @@ export default {
   animation-timing-function: linear;
   pointer-events: none;
   user-select: none;
+  position: absolute;
+  top: 50%;
+  left:50%;
+  transform: translate(-50%, -50%);
 }
 
 .infoQuiebre{
@@ -581,6 +588,11 @@ export default {
 
 #botonEnviarEco{
   padding: 15px;
+}
+
+.deshabilitado{
+  opacity: 0.6;
+  pointer-events: none;
 }
 @keyframes girar {
   0% {
