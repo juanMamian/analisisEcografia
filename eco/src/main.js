@@ -7,7 +7,7 @@ var local=window.location.href.substring(7, 16);
 
 
 const serverUrl=process.env.NODE_ENV === 'production' && local!="localhost"
-? 'https://fhr-eco.herokuapp.com'
+? 'https://analisisdoppler.herokuapp.com'
 : 'http://localhost:3000'
 
 Vue.mixin({
