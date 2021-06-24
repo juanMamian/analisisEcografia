@@ -22,7 +22,7 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
     const ecografia = req.file;
 
     const zona = JSON.parse(req.body.posicionesZonaAnalisis);
-
+    console.log(`Analisis en ${JSON.stringify(zona)}`);
     Jimp.read(ecografia.buffer).then(async (imagen) => {
         var linea = [];
 
@@ -32,7 +32,13 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
 
         //Analizando marcas de tiempo:
         for (var x = zona.x1; x <= zona.x2; x++) {
-            if (imagen.getPixelColor(x, zona.y2 - 1) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 2) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 3) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 4) > 0x1b1b1bff) { //Deteccion de un blanco                    
+            let blancoDetected=false;
+            for(var m=zona.y2-12; m<zona.y2;m++){
+                if(imagen.getPixelColor(x, m)> 0x1b1b1bff){
+                    blancoDetected=true;
+                }
+            }
+            if (blancoDetected) { //Deteccion de un blanco                    
                 if (pisandoMarcaTiempo === false) {//Inicio de marca tiempo
                     actualMarcaTiempo = [];
                 }
@@ -45,11 +51,13 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
                         console.log(`Error. se detectó un hueco sin haber detectado marcas de tiempo`);
                     }
                     let sum = 0;
+                    console.log(`Marcas tiempo en: ${actualMarcaTiempo}`);
                     for (var i = 0; i < actualMarcaTiempo.length; i++) {
                         sum += actualMarcaTiempo[i];
                     }
                     let prom = sum / actualMarcaTiempo.length;
                     marcasTiempo.push(prom - zona.x1);
+                    console.log(`Marca promedio en ${prom}`);
                 }
                 pisandoMarcaTiempo = false;
             }
@@ -71,7 +79,6 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
         var puntosQuiebre: any[] = [];
         const umbralComboBreaker = 3;
         const umbralCombo = Math.round(segundoPx/35);
-        console.log(`Umbral combo: ${umbralCombo}`);
         var posiblePuntoQuiebre = 0;
         var recordAltura=0;
 
@@ -93,8 +100,6 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
                     posiblePuntoQuiebre = k - 1;
                     recordAltura=linea[posiblePuntoQuiebre];                    
                     comboBreaker=0;
-
-                    console.log(posiblePuntoQuiebre);
                     // console.log(`Record altura: ${recordAltura}`);
                 }
                 combo++;
@@ -136,14 +141,10 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
         }
 
         //calcular ajuste suma
-        console.log(`Intervalos: ${puntosQuiebre.map(p=>p.intervalo)}`);
-        console.log(`Bpms: ${puntosQuiebre.map(p=>p.bpm)}`);
         var promedioBpm= puntosQuiebre.filter(p=>p.bpm).map(p=>p.bpm).reduce((a, b)=> {return a+b}, 0)/(puntosQuiebre.length-1);
         
-        console.log(`Promedio bpm: ${promedioBpm}`);
 
         var ajusteBpm=150-promedioBpm;
-        console.log(`Ajuste: ${ajusteBpm}`);
 
         for (var k = 1; k < puntosQuiebre.length; k++) {
             puntosQuiebre[k].bpmAjustado=puntosQuiebre[k].bpm+ajusteBpm;

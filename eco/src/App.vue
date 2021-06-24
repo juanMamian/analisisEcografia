@@ -112,7 +112,7 @@
           </div>
         </div>
         <br><br>
-      <button v-show="imagenSelected" @click="uploadEcografia" ref="botonEnviarEco" id="botonEnviarEco">Aceptar</button>
+      <button v-show="imagenSelected" @click="uploadEcografia" ref="botonEnviarEco" id="botonEnviarEco">Analizar</button>
 
       </center>
 
@@ -208,8 +208,8 @@ export default {
         oord = "y2";
       }
 
-      this.$set(this.posicionesZonaAnalisis, absc, posClick.x);
-      this.$set(this.posicionesZonaAnalisis, oord, posClick.y);
+      this.$set(this.posicionesZonaAnalisis, absc, Math.round(posClick.x));
+      this.$set(this.posicionesZonaAnalisis, oord, Math.round(posClick.y));
 
       if (this.posicionesZonaAnalisis.x1 < 0)
         this.$set(this.posicionesZonaAnalisis, "x1", 0);
@@ -250,13 +250,15 @@ export default {
       this.imagenSelected = true;
       if (FileReader && archivo) {
         this.vaciarAnalisis();
+        this.respuestaRecibida=false;
         var fr = new FileReader();
         fr.onload = function () {
           dis.$refs.imagenSeleccionada.src = fr.result;
           dis.$nextTick(() => {
             var anchoImagen = dis.$refs.imagenSeleccionada.offsetWidth;
             var altoImagen = dis.$refs.imagenSeleccionada.offsetHeight;
-
+            console.log(`AnchoImagen: ${anchoImagen}`);
+            console.log(`AltoImagen: ${altoImagen}`);
             dis.$set(dis.sizeImagenSeleccionada, "x", anchoImagen);
             dis.$set(dis.sizeImagenSeleccionada, "y", altoImagen);
             if(dis.posicionesZonaAnalisis.x2-dis.posicionesZonaAnalisis.x1==0 || dis.posicionesZonaAnalisis.y2-dis.posicionesZonaAnalisis.y1==0){
@@ -525,7 +527,7 @@ export default {
 
 .infoQuiebre{
   background-color: rgb(169, 231, 233);
-  font-size: 10px;
+  font-size: 11px;
   padding: 5px;
   border-radius: 6px;
   position: absolute;    
@@ -534,13 +536,11 @@ export default {
 .infoIntervalo{
   right: 2px;
   bottom: 101%;
-  font-size: 8px;
   padding: 2px 13px;
 }
 .infoIntervaloAjustado{
   right: 2px;
-  top: -35px;
-  font-size: 8px;
+  top: -40px;
   padding: 2px 13px;
   background-color: rgb(255, 151, 133);
 }
