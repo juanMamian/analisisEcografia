@@ -35,27 +35,156 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
 var router = require("express").Router();
 var multer = require("multer");
 var upload = multer();
+var jimp_1 = __importDefault(require("jimp"));
 router.post("/analizarImagen", upload.single("ecografia"), function (req, res) {
     return __awaiter(this, void 0, void 0, function () {
-        var ecografia;
+        var ecografia, zona;
+        var _this = this;
         return __generator(this, function (_a) {
+            console.log("************");
             if (!req.file) {
                 console.log("No hab\u00EDa archivo");
                 return [2 /*return*/, res.status(400)];
             }
             ecografia = req.file;
-            console.log("Recibido un archivo con nombre " + ecografia.originalname);
-            return [2 /*return*/, res.send("Archivo " + ecografia.originalname + " analizado")];
+            zona = JSON.parse(req.body.posicionesZonaAnalisis);
+            jimp_1.default.read(ecografia.buffer).then(function (imagen) { return __awaiter(_this, void 0, void 0, function () {
+                var linea, pisandoMarcaTiempo, marcasTiempo, actualMarcaTiempo, x, sum, i, prom, distanciasPx, j, segundoPx, combo, comboBreaker, puntosQuiebre, umbralComboBreaker, umbralCombo, posiblePuntoQuiebre, recordAltura, x, y, colorPixel, k, pendiente, k, promedioBpm, ajusteBpm, k, m;
+                return __generator(this, function (_a) {
+                    linea = [];
+                    pisandoMarcaTiempo = false;
+                    marcasTiempo = [];
+                    actualMarcaTiempo = [];
+                    //Analizando marcas de tiempo:
+                    for (x = zona.x1; x <= zona.x2; x++) {
+                        if (imagen.getPixelColor(x, zona.y2 - 1) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 2) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 3) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 4) > 0x1b1b1bff) { //Deteccion de un blanco                    
+                            if (pisandoMarcaTiempo === false) { //Inicio de marca tiempo
+                                actualMarcaTiempo = [];
+                            }
+                            actualMarcaTiempo.push(x);
+                            pisandoMarcaTiempo = true;
+                        }
+                        else { //deteccion de hueco                
+                            if (pisandoMarcaTiempo) { //Venía pisando una marca tiempo. Se acabó. Ha quedado detectada
+                                if (actualMarcaTiempo.length == 0) {
+                                    console.log("Error. se detect\u00F3 un hueco sin haber detectado marcas de tiempo");
+                                }
+                                sum = 0;
+                                for (i = 0; i < actualMarcaTiempo.length; i++) {
+                                    sum += actualMarcaTiempo[i];
+                                }
+                                prom = sum / actualMarcaTiempo.length;
+                                marcasTiempo.push(prom - zona.x1);
+                            }
+                            pisandoMarcaTiempo = false;
+                        }
+                    }
+                    distanciasPx = [];
+                    for (j = 0; j < (marcasTiempo.length - 1); j++) {
+                        distanciasPx.push(marcasTiempo[j + 1] - marcasTiempo[j]);
+                    }
+                    console.log("Distancias entre marcas de tiempo (Px): " + distanciasPx);
+                    segundoPx = (distanciasPx.reduce(function (a, b) { return a + b; }, 0) / distanciasPx.length) * 2;
+                    console.log("Segundo en pixeles: " + segundoPx);
+                    combo = 0;
+                    comboBreaker = 0;
+                    puntosQuiebre = [];
+                    umbralComboBreaker = 3;
+                    umbralCombo = Math.round(segundoPx / 35);
+                    console.log("Umbral combo: " + umbralCombo);
+                    posiblePuntoQuiebre = 0;
+                    recordAltura = 0;
+                    for (x = zona.x1; x <= zona.x2; x++) {
+                        //Recorrido vertical de cada columna de pixeles
+                        for (y = zona.y1; y <= zona.y2; y++) {
+                            colorPixel = imagen.getPixelColor(x, y);
+                            if (colorPixel > 0x1b1b1bff) { //Deteccion de un blanco                                                          
+                                linea.push(y - zona.y1);
+                                break;
+                            }
+                        }
+                    }
+                    for (k = 1; k < linea.length; k++) {
+                        pendiente = linea[k - 1] - linea[k];
+                        if (pendiente > 0) { //Subiendo                
+                            if (combo === 0) { //Era el primer punto del combo
+                                posiblePuntoQuiebre = k - 1;
+                                recordAltura = linea[posiblePuntoQuiebre];
+                                comboBreaker = 0;
+                                console.log(posiblePuntoQuiebre);
+                                // console.log(`Record altura: ${recordAltura}`);
+                            }
+                            combo++;
+                            comboBreaker -= 0.5;
+                            if (comboBreaker < 0)
+                                comboBreaker = 0;
+                        }
+                        if (combo > 0) {
+                            if (linea[k] >= (recordAltura)) { //Si la linea esta por debajo del record de altura tenemos combo breaker
+                                comboBreaker++;
+                            }
+                            else {
+                                comboBreaker = 0;
+                                recordAltura = linea[k];
+                            }
+                            // console.log(`${k}: ${pendiente}. ${combo>0?'Combo: ' + combo:''}. Breaker: ${comboBreaker}`);
+                            if (comboBreaker >= umbralComboBreaker || comboBreaker > combo || linea[k] >= ((recordAltura + linea[posiblePuntoQuiebre]) / 2)) {
+                                // console.log(`Break`);
+                                //Se ha terminado un combo.
+                                //Verificar si es un combo suficientemente largo
+                                if (combo > umbralCombo) {
+                                    puntosQuiebre.push({ left: posiblePuntoQuiebre, intervalo: null, variacion: null, });
+                                }
+                                combo = 0;
+                                comboBreaker = 0;
+                            }
+                        }
+                    }
+                    //Calcular longitudes de onda.        
+                    for (k = 1; k < puntosQuiebre.length; k++) {
+                        puntosQuiebre[k].intervalo = ((puntosQuiebre[k].left - puntosQuiebre[k - 1].left) / segundoPx) * 1000;
+                        puntosQuiebre[k].bpm = 60000 / (puntosQuiebre[k].intervalo);
+                    }
+                    //calcular ajuste suma
+                    console.log("Intervalos: " + puntosQuiebre.map(function (p) { return p.intervalo; }));
+                    console.log("Bpms: " + puntosQuiebre.map(function (p) { return p.bpm; }));
+                    promedioBpm = puntosQuiebre.filter(function (p) { return p.bpm; }).map(function (p) { return p.bpm; }).reduce(function (a, b) { return a + b; }, 0) / (puntosQuiebre.length - 1);
+                    console.log("Promedio bpm: " + promedioBpm);
+                    ajusteBpm = 150 - promedioBpm;
+                    console.log("Ajuste: " + ajusteBpm);
+                    for (k = 1; k < puntosQuiebre.length; k++) {
+                        puntosQuiebre[k].bpmAjustado = puntosQuiebre[k].bpm + ajusteBpm;
+                        puntosQuiebre[k].intervaloAjustado = 60000 / puntosQuiebre[k].bpmAjustado;
+                    }
+                    //Calcular variabilidades.
+                    for (m = 2; m < (puntosQuiebre.length); m++) {
+                        if (puntosQuiebre[m].intervalo && puntosQuiebre[m - 1].intervalo) {
+                            puntosQuiebre[m].variacion = puntosQuiebre[m].intervalo - puntosQuiebre[m - 1].intervalo;
+                            puntosQuiebre[m].variacionAjustada = puntosQuiebre[m].intervaloAjustado - puntosQuiebre[m - 1].intervaloAjustado;
+                        }
+                    }
+                    // console.log(`Puntos quiebre; ${JSON.stringify(puntosQuiebre)}`);
+                    return [2 /*return*/, res.send({ linea: linea, marcasTiempo: marcasTiempo, puntosQuiebre: puntosQuiebre, margenError: 500 / segundoPx })];
+                });
+            }); }).catch(function (error) {
+                console.log("Error leyendo la ecograf\u00EDa: " + error);
+                return res.status(400).send("Error leyendo archivo");
+            });
+            return [2 /*return*/];
         });
     });
 });
-router.get("/", function (res) {
+router.get("/", function (_, res) {
     return res.send("test");
 });
-router.get("/test", function (res) {
+router.get("/test", function (_, res) {
     return res.send("test");
 });
 module.exports = router;

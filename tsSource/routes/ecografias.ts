@@ -3,127 +3,54 @@ const multer = require("multer");
 const upload = multer();
 import Jimp from "jimp"
 
-type PuntoQuiebre={
+type PuntoQuiebre = {
     left: number,
     intervalo: number | null,
+    intervaloAjustado: number | null,
     variacion: number | null,
+    variacionAjustada: number | null,
+    bpm: number | null,
+    bpmAjustado: number | null,
 }
 
 router.post("/analizarImagen", upload.single("ecografia"), async function (req: any, res: any) {
-
+    console.log(`************`);
     if (!req.file) {
         console.log(`No había archivo`);
         return res.status(400);
     }
     const ecografia = req.file;
 
-
-
-    console.log(`Recibido un archivo con nombre ${ecografia.originalname} y zonaAnalisis: ${req.body.posicionesZonaAnalisis}`);
     const zona = JSON.parse(req.body.posicionesZonaAnalisis);
 
     Jimp.read(ecografia.buffer).then(async (imagen) => {
         var linea = [];
-        var lineaNegroInferior = [];
-        const umbralNegroInferior = 30;
 
         var pisandoMarcaTiempo = false;
         var marcasTiempo = [];
         var actualMarcaTiempo = [];
 
-        console.log(`Analizando en y desde ${zona.y1} hasta ${zona.y2}`);
-
-        var combo = 0;
-        var comboBreaker = 0;
-        var puntosQuiebre: any[] = [];
-        const umbralComboBreaker = 6;
-        const umbralCombo = 9;
-        var posiblePuntoQuiebre = 0;
-
+        //Analizando marcas de tiempo:
         for (var x = zona.x1; x <= zona.x2; x++) {
-            let area = "negroSuperior";
-            let cambioNegroInferior = 0;
-            var columnaMarcaTiempo = false;
-            let contornoNegroInferiorDetected = false;
-            let pendiente = 0;
-            //Recorrido vertical de cada columna de pixeles
-            for (var y = zona.y1; y <= zona.y2; y++) {
-                // console.log(`${x} - ${area}`);       
-                let colorPixel=imagen.getPixelColor(x, y);        
-                if (colorPixel > 0x1b1b1bff) { //Deteccion de un blanco                    
-                    if (area === "negroSuperior") {//Detección del contorno de la eco.
-                        area = "blancoEco";
-                        cambioNegroInferior = 0;
-                        linea.push(y - zona.y1);
-
-                    }
-                    else if (area === "blancoEco") {
-                        // console.log(`Color pixel: ${colorPixel}`);
-                        cambioNegroInferior = 0;
-                    }
-                    else if (area === "negroInferior" && colorPixel>0xecd7d7ff && y>(zona.y2-10)) { //Detección de una marca de tiempo
-                        console.log(`Marca tiempo en ${x}, ${y}: ${colorPixel}`);
-                        actualMarcaTiempo.push(x);
-                        pisandoMarcaTiempo = true;
-                        columnaMarcaTiempo = true;
-                        area = "final";
-                    }
+            if (imagen.getPixelColor(x, zona.y2 - 1) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 2) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 3) > 0x1b1b1bff || imagen.getPixelColor(x, zona.y2 - 4) > 0x1b1b1bff) { //Deteccion de un blanco                    
+                if (pisandoMarcaTiempo === false) {//Inicio de marca tiempo
+                    actualMarcaTiempo = [];
                 }
-                else {                                   //Deteccion de un negro
-                    if (area === "blancoEco") {
-                        cambioNegroInferior++;
-                        if (cambioNegroInferior > umbralNegroInferior) {
-                            //console.log(`${x} entrando en negro inferior`);
-                            area = "negroInferior";
-                            if (!contornoNegroInferiorDetected) {
-                                lineaNegroInferior.push(y - zona.y1);
-                                contornoNegroInferiorDetected = true;
-                            }
-                        }
-                    }
-                }
+                actualMarcaTiempo.push(x)
+                pisandoMarcaTiempo = true;
             }
-            if (x > zona.x1) { //A partir del segundo pixel, análisis de pendientes.
-                pendiente = linea[linea.length - 2] - linea[linea.length - 1];
-                if (pendiente > 0) { //Subiendo
-                    if (pendiente > 1) {
-                        if (combo === 0) {//Era el primer punto del combo
-                            posiblePuntoQuiebre = x - 1;
-                        }
-                        combo++;
+            else {//deteccion de hueco                
+                if (pisandoMarcaTiempo) {//Venía pisando una marca tiempo. Se acabó. Ha quedado detectada
+                    if (actualMarcaTiempo.length == 0) {
+                        console.log(`Error. se detectó un hueco sin haber detectado marcas de tiempo`);
                     }
-
-
-                }
-                else {            //Bajando o estancándose
-                    comboBreaker++
-                }
-
-                if (comboBreaker > umbralComboBreaker) {
-                    //Se ha terminado un combo.
-                    //Verificar si es un combo suficientemente largo
-                    if (combo > umbralCombo) {
-                        puntosQuiebre.push({left: posiblePuntoQuiebre - zona.x1, intervalo:null, variacion: null,});
-                    }
-                    combo = 0;
-                    comboBreaker = 0;
-
-                }
-
-            }
-            //Calcular marca tiempo si no se tocó ninguna marca tiempo.                               
-
-            if (!columnaMarcaTiempo) {
-                if (pisandoMarcaTiempo && actualMarcaTiempo.length > 0) {
-                    var sum = 0;
+                    let sum = 0;
                     for (var i = 0; i < actualMarcaTiempo.length; i++) {
                         sum += actualMarcaTiempo[i];
                     }
-                    var prom = sum / actualMarcaTiempo.length;
+                    let prom = sum / actualMarcaTiempo.length;
                     marcasTiempo.push(prom - zona.x1);
-                    actualMarcaTiempo = [];
                 }
-
                 pisandoMarcaTiempo = false;
             }
         }
@@ -134,34 +61,111 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
             distanciasPx.push(marcasTiempo[j + 1] - marcasTiempo[j]);
         }
 
-
-        console.log(`Distancias entre marcas de tiempo: ${marcasTiempo}`);
-
         console.log(`Distancias entre marcas de tiempo (Px): ${distanciasPx}`);
 
-        const segundoPx = (distanciasPx.reduce((a, b) => a + b, 0) / distanciasPx.length)*2;
+        const segundoPx = (distanciasPx.reduce((a, b) => a + b, 0) / distanciasPx.length) * 2;
+        console.log(`Segundo en pixeles: ${segundoPx}`);
+
+        var combo = 0;
+        var comboBreaker = 0;
+        var puntosQuiebre: any[] = [];
+        const umbralComboBreaker = 3;
+        const umbralCombo = Math.round(segundoPx/35);
+        console.log(`Umbral combo: ${umbralCombo}`);
+        var posiblePuntoQuiebre = 0;
+        var recordAltura=0;
+
+        for (var x = zona.x1; x <= zona.x2; x++) {
+            //Recorrido vertical de cada columna de pixeles
+            for (var y = zona.y1; y <= zona.y2; y++) {
+                let colorPixel = imagen.getPixelColor(x, y);
+                if (colorPixel > 0x1b1b1bff) { //Deteccion de un blanco                                                          
+                    linea.push(y - zona.y1);
+                    break;
+                }
+            }
+        }
+
+        for (var k = 1; k < linea.length; k++) {
+            let pendiente = linea[k-1] - linea[k];
+            if (pendiente > 0) { //Subiendo                
+                if (combo === 0) {//Era el primer punto del combo
+                    posiblePuntoQuiebre = k - 1;
+                    recordAltura=linea[posiblePuntoQuiebre];                    
+                    comboBreaker=0;
+
+                    console.log(posiblePuntoQuiebre);
+                    // console.log(`Record altura: ${recordAltura}`);
+                }
+                combo++;
+                comboBreaker-=0.5;
+                if(comboBreaker<0)comboBreaker=0;                            
+            }
+
+            if(combo>0){
+                if(linea[k]>=(recordAltura)){ //Si la linea esta por debajo del record de altura tenemos combo breaker
+                    comboBreaker++;
+                }
+                else{
+                    comboBreaker=0;
+                    recordAltura=linea[k]
+                }
+
+                // console.log(`${k}: ${pendiente}. ${combo>0?'Combo: ' + combo:''}. Breaker: ${comboBreaker}`);
+
+                if (comboBreaker >= umbralComboBreaker || comboBreaker>combo || linea[k]>=((recordAltura+linea[posiblePuntoQuiebre])/2)  ) {
+                    // console.log(`Break`);
+                    //Se ha terminado un combo.
+                    //Verificar si es un combo suficientemente largo
+                    if (combo > umbralCombo) {
+                        puntosQuiebre.push({ left: posiblePuntoQuiebre, intervalo: null, variacion: null, });
+                    }
+                    combo = 0;
+                    comboBreaker = 0;
+                }    
+            }                        
+            
+
+
+        }
 
         //Calcular longitudes de onda.        
         for (var k = 1; k < puntosQuiebre.length; k++) {
-            puntosQuiebre[k].intervalo=((puntosQuiebre[k].left - puntosQuiebre[k-1].left)/segundoPx)*1000;
+            puntosQuiebre[k].intervalo = ((puntosQuiebre[k].left - puntosQuiebre[k - 1].left) / segundoPx) * 1000;
+            puntosQuiebre[k].bpm=60000/(puntosQuiebre[k].intervalo);
+        }
+
+        //calcular ajuste suma
+        console.log(`Intervalos: ${puntosQuiebre.map(p=>p.intervalo)}`);
+        console.log(`Bpms: ${puntosQuiebre.map(p=>p.bpm)}`);
+        var promedioBpm= puntosQuiebre.filter(p=>p.bpm).map(p=>p.bpm).reduce((a, b)=> {return a+b}, 0)/(puntosQuiebre.length-1);
+        
+        console.log(`Promedio bpm: ${promedioBpm}`);
+
+        var ajusteBpm=150-promedioBpm;
+        console.log(`Ajuste: ${ajusteBpm}`);
+
+        for (var k = 1; k < puntosQuiebre.length; k++) {
+            puntosQuiebre[k].bpmAjustado=puntosQuiebre[k].bpm+ajusteBpm;
+            puntosQuiebre[k].intervaloAjustado=60000/puntosQuiebre[k].bpmAjustado;
         }
 
         //Calcular variabilidades.
-        
+
         for (var m = 2; m < (puntosQuiebre.length); m++) {
-            if(puntosQuiebre[m].intervalo && puntosQuiebre[m-1].intervalo){
-                puntosQuiebre[m].variacion=puntosQuiebre[m].intervalo-puntosQuiebre[m-1].intervalo;
+            if (puntosQuiebre[m].intervalo && puntosQuiebre[m - 1].intervalo) {
+                puntosQuiebre[m].variacion = puntosQuiebre[m].intervalo - puntosQuiebre[m - 1].intervalo;
+                puntosQuiebre[m].variacionAjustada = puntosQuiebre[m].intervaloAjustado - puntosQuiebre[m - 1].intervaloAjustado;
             }
-            
         }
+        // console.log(`Puntos quiebre; ${JSON.stringify(puntosQuiebre)}`);
 
-
-        return res.send({ linea: JSON.stringify(linea), marcasTiempo, lineaNegroInferior: JSON.stringify(lineaNegroInferior), puntosQuiebre, });
+        return res.send({ linea, marcasTiempo, puntosQuiebre, margenError: 500/segundoPx });
 
 
     }).catch((error) => {
         console.log(`Error leyendo la ecografía: ${error}`);
-        return res.status(400).send("Error letendo archivo");
+        return res.status(400).send("Error leyendo archivo");
     })
 
 });

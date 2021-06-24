@@ -7,10 +7,7 @@ dotenv.config();
 app.use(express.json());
 
 app.use("/ecografias", cors() , rutasEcografias);
-
-app.get('/', (req, res)=>{
-    res.send("Vivo");
-})
+app.use("/analisisDoppler", express.static(__dirname + '/analisisDoppler'));
 
 
 

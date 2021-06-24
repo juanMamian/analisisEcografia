@@ -11,9 +11,7 @@ var rutasEcografias = require("./routes/ecografias");
 dotenv.config();
 app.use(express_1.default.json());
 app.use("/ecografias", cors(), rutasEcografias);
-app.get('/', function (req, res) {
-    res.send("Vivo");
-});
+app.use("/analisisDoppler", express_1.default.static(__dirname + '/analisisDoppler'));
 var puerto = process.env.PORT || 3000;
 app.listen(puerto, function () {
     console.log("\u00A1Aplicacion up!");

@@ -25,7 +25,7 @@
           @mousemove="resizeZonaAnalisis"
           @keyup.left="setZonaAnalisis"
         >
-          <canvas id="canvasAnalisis"></canvas>
+          <canvas id="canvasContorno" ref="canvasContorno" v-show="showContornoEco"></canvas>
 
           <img
             draggable="false"
@@ -36,15 +36,30 @@
           />
 
           <div id="zonaAnalisis" :style="[offsetZonaAnalisis]">
-            <div id="controlesZonaAnalisis">
-              <radio name="showContornoEco" id="showContornoEco" v-model="showContornoEco"></radio>
+            <div id="controlesZonaAnalisis" v-show="respuestaRecibida">
+              <div class="bloqueControl">
+                <label for="showContornoEco" class="labelCheckbox">Contorno</label><input class="checkControlAnalisis" type="checkbox" name="showContornoEco" id="showContornoEco" v-model="showContornoEco"> 
+              </div>
+              <div class="bloqueControl">
+                <label for="showMarcasR" class="labelCheckbox">R</label><input type="checkbox" class="checkControlAnalisis" name="showMarcasR" id="showMarcasR" v-model="showMarcasR">
+              </div>
+              <div id="infoVariabilidad" class="infoAnalisis" v-if="variabilidad">
+                Variación promedio: {{variabilidad.toFixed(2)}} <br>
+                Ajustada: {{variabilidadAjustada.toFixed(2)}}
+              </div>
+              <div id="infoMargenError" class="infoAnalisis" v-if="margenError">
+                Margen de error: {{margenError.toFixed(2)}}ms
+              </div>
             </div>
-            <div class="marcaQuiebre" v-for="(quiebre, index) of quiebres" :key="'quiebre'+index" :style="[{left: (quiebre.left-1)+'px'}]">              
+            <div class="marcaQuiebre" v-show="showMarcasR" v-for="(quiebre, index) of quiebres" :key="'quiebre'+index" :style="[{left: (quiebre.left-1)+'px'}]">              
               <div class="controlesQuiebre">
                 
               </div>              
               <div class="infoQuiebre infoIntervalo" v-if="quiebre.intervalo!=null">{{quiebre.intervalo.toFixed(2)}}ms</div>
+              <div class="infoQuiebre infoIntervaloAjustado" v-if="quiebre.intervalo!=null">{{quiebre.intervaloAjustado.toFixed(2)}}ms</div>
             </div>
+
+            <div id="lineaMarcasTiempo"></div>
 
             <div
               class="agarraderoZonaAnalisis"
@@ -96,9 +111,11 @@
             </div>
           </div>
         </div>
+        <br><br>
+      <button v-show="imagenSelected" @click="uploadEcografia" ref="botonEnviarEco" id="botonEnviarEco">Aceptar</button>
+
       </center>
 
-      <button @click="uploadEcografia">Aceptar</button>
     </div>
 
     <div id="tablaResultados">
@@ -122,6 +139,7 @@ export default {
       respuestaRecibida: false,
       urlImagenRespuesta: null,
       quiebres:[],
+      margenError: null,
 
       sizeImagenSeleccionada: {
         x: null,
@@ -138,7 +156,8 @@ export default {
       },
       umbralSize: 30,
       resizingZonaAnalisis: [false, false, false, false],
-      showContornoEco:true
+      showContornoEco:true,
+      showMarcasR:true,
       
     };
   },
@@ -146,26 +165,25 @@ export default {
     setZonaAnalisis() {
       this.resizingZonaAnalisis = false;
     },
-
-    iniciarResize(agarradero) {
+    vaciarAnalisis(){
       this.quiebres=[];
+      var canvas=this.$refs.canvasContorno;
+      var lapiz=canvas.getContext("2d");
+      lapiz.clearRect(0,0, canvas.width, canvas.height);
+    },
+    iniciarResize(agarradero) {
+      this.vaciarAnalisis()      
       this.resizingZonaAnalisis.fill(false);
       this.resizingZonaAnalisis.splice(agarradero, 1, true);
     },
-
-    endResize(agarradero) {
-      console.log(`Ending resize desde ${agarradero}`);
+    endResize() {
       this.resizingZonaAnalisis.splice(0, 1, false);
       this.resizingZonaAnalisis.splice(1, 1, false);
       this.resizingZonaAnalisis.splice(2, 1, false);
       this.resizingZonaAnalisis.splice(3, 1, false);
     },
-
     resizeZonaAnalisis(agarradero, e) {
       if (!this.resizingZonaAnalisis[agarradero]) return;
-
-      console.log(`Rezising desde el agarradero ${agarradero}`);
-
       const posParent = document
         .getElementById("zonaImagenSeleccionada")
         .getBoundingClientRect();
@@ -231,6 +249,7 @@ export default {
       const dis = this;
       this.imagenSelected = true;
       if (FileReader && archivo) {
+        this.vaciarAnalisis();
         var fr = new FileReader();
         fr.onload = function () {
           dis.$refs.imagenSeleccionada.src = fr.result;
@@ -240,15 +259,17 @@ export default {
 
             dis.$set(dis.sizeImagenSeleccionada, "x", anchoImagen);
             dis.$set(dis.sizeImagenSeleccionada, "y", altoImagen);
+            if(dis.posicionesZonaAnalisis.x2-dis.posicionesZonaAnalisis.x1==0 || dis.posicionesZonaAnalisis.y2-dis.posicionesZonaAnalisis.y1==0){
+              dis.posicionesZonaAnalisis = {
+                x1: 0,
+                y1: 0,
 
-            dis.posicionesZonaAnalisis = {
-              x1: 0,
-              y1: 0,
-
-              x2: anchoImagen,
-              y2: altoImagen,
-            };
-            dis.setcanvasAnalisis;
+                x2: anchoImagen,
+                y2: altoImagen,
+              };            
+            }
+            dis.$set(dis.posicionesZonaAnalisis, "y2", altoImagen);
+            
           });
         };
         fr.readAsDataURL(archivo);
@@ -277,14 +298,14 @@ export default {
         //responseType:"blob"
       })
         .then(function ({ data }) {
+          dis.respuestaRecibida=true;
           dis.enviandoEco = false;
           //console.log(`Eco analizada: ${JSON.stringify(data)}`);
-          dis.trazarContornoEco(JSON.parse(data.linea));
-          dis.trazarContornoNegroInferior(JSON.parse(data.lineaNegroInferior));
-          console.log(`Marcas tiempo: ${data.marcasTiempo}`);
+          dis.trazarContornoEco(data.linea);          
           dis.marcarTiempos(data.marcasTiempo);
           //dis.marcarQuiebres(data.puntosQuiebre);
-          dis.quiebres=data.puntosQuiebre;          
+          dis.quiebres=data.puntosQuiebre;     
+          dis.margenError=data.margenError;     
           // var urlCreator = window.URL || window.webkitURL;
           // urlCreator.revokeObjectURL(dis.urlImagenRespuesta);
           // dis.urlImagenRespuesta = urlCreator.createObjectURL(data);
@@ -296,9 +317,8 @@ export default {
     },
     trazarContornoEco(linea) {
       var posZona = document.getElementById("zonaAnalisis");
-      var canvas = document.getElementById("canvasAnalisis");
+      var canvas = document.getElementById("canvasContorno");
 
-      console.log(`Ubicando canvas. Height: ${posZona.style.height}`);
       canvas.style.left = posZona.style.left;
       canvas.style.top = posZona.style.top;
       canvas.style.width = posZona.style.width;
@@ -309,25 +329,13 @@ export default {
       var lapiz = canvas.getContext("2d");
       lapiz.fillStyle="red";
 
-      console.log(`Trazando contorno`);
       for (var x = 0; x < parseInt(posZona.style.width); x++) {
         lapiz.fillRect((x), linea[x], 1, 1);
       }
-    },
-    trazarContornoNegroInferior(linea) {
-      var posZona = document.getElementById("zonaAnalisis");
-      var canvas = document.getElementById("canvasAnalisis");
-      
-      var lapiz = canvas.getContext("2d");
-      lapiz.fillStyle="blue";
-
-      for (var x = 0; x < parseInt(posZona.style.width); x++) {
-        lapiz.fillRect((x), linea[x], 1, 1);
-      }
-    },
+    },    
     marcarTiempos(marcas){
       var posZona = document.getElementById("zonaAnalisis").getBoundingClientRect();
-      var canvas = document.getElementById("canvasAnalisis");
+      var canvas = document.getElementById("canvasContorno");
       var lapiz = canvas.getContext("2d");
 
       lapiz.fillStyle="yellow";
@@ -339,13 +347,28 @@ export default {
     marcarQuiebres(marcas){
       console.log(`Trazando quiebres: ${marcas}`);
       var posZona = document.getElementById("zonaAnalisis").getBoundingClientRect();
-      var canvas = document.getElementById("canvasAnalisis");
+      var canvas = document.getElementById("canvasContorno");
       var lapiz = canvas.getContext("2d");
 
       lapiz.fillStyle="green";
       for(var i=0;i<marcas.length;i++){
         lapiz.fillRect(marcas[i], 0, 1, posZona.height);
 
+      }
+    },
+    teclaPresionada(e){
+      
+      if(e.which===13 && this.imagenSelected){
+        this.$refs.botonEnviarEco.click();
+      }
+      if(e.which===78){
+        this.$refs.inputEcografia.click();
+      }
+      if(e.which===82){
+        document.getElementById("showMarcasR").click();
+      }
+      if(e.which===67){
+        document.getElementById("showContornoEco").click();        
       }
     }
   },
@@ -367,9 +390,23 @@ export default {
           "px",
       };
     },
+    variabilidad(){
+      var variaciones=this.quiebres.filter(q=>q.variacion).map(q=>q.variacion);
+      if(variaciones.length<1)return null;
+
+      return variaciones.reduce((a, b)=>{return (Math.abs(a)+Math.abs(b))}, 0)/variaciones.length
+    },
+    variabilidadAjustada(){
+      var variaciones=this.quiebres.filter(q=>q.variacionAjustada).map(q=>q.variacionAjustada);
+      if(variaciones.length<1)return null;
+
+      return variaciones.reduce((a, b)=>{return (Math.abs(a)+Math.abs(b))}, 0)/variaciones.length
+    }
   },
   mounted() {
     this.montado = true;
+    document.addEventListener('keyup', this.teclaPresionada);
+    
   },
 };
 </script>
@@ -387,7 +424,7 @@ export default {
   pointer-events: none;
   user-select: none;
 }
-#canvasAnalisis {
+#canvasContorno {
   position: absolute;
   top: 0px;
   left: 0px;
@@ -402,17 +439,20 @@ export default {
   box-sizing: border-box;
 }
 
-#controlesZonaAnalisis{
+#lineaMarcasTiempo{
+  height: 1px;
+  width: 100%;
   position: absolute;
-  top: 2%;
-  left: 101%;
-
+  left: 0px;
+  bottom: 2px;
+  background-color: yellow;
 }
+
 
 .marcaQuiebre{
   width:1px;
   height: 100%;
-  opacity: 0.5;
+  opacity: 0.9;
   position: absolute;
   top: 0px;
   
@@ -484,7 +524,7 @@ export default {
 }
 
 .infoQuiebre{
-  background-color: cadetblue;
+  background-color: rgb(169, 231, 233);
   font-size: 10px;
   padding: 5px;
   border-radius: 6px;
@@ -497,7 +537,51 @@ export default {
   font-size: 8px;
   padding: 2px 13px;
 }
+.infoIntervaloAjustado{
+  right: 2px;
+  top: -35px;
+  font-size: 8px;
+  padding: 2px 13px;
+  background-color: rgb(255, 151, 133);
+}
 
+#controlesZonaAnalisis{
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  background-color: rgb(245, 178, 168);
+  border:1px solid rgb(71, 17, 7);
+  border-radius: 10px;
+  transform:translate(-50%, -100%);
+  padding: 15px;
+}
+
+.bloqueControl{
+  min-width: 120px;
+  margin: 5px 0px;
+  display: grid;
+  grid-template-columns: 1fr 50px;
+}
+
+.labelCheckbox{
+  font-size: 13px;
+}
+.checkControlAnalisis{
+  margin-left: auto;
+}
+
+.infoAnalisis{
+  font-size: 13px;
+}
+
+#infoVariabilidad{
+  padding: 5px;
+  border: 1px solid black;
+}
+
+#botonEnviarEco{
+  padding: 15px;
+}
 @keyframes girar {
   0% {
     transform: rotateZ(0deg);
