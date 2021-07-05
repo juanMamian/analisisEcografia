@@ -26,6 +26,7 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
     Jimp.read(ecografia.buffer).then(async (imagen) => {
         var linea = [];
 
+        
         var pisandoMarcaTiempo = false;
         var marcasTiempo = [];
         var actualMarcaTiempo = [];
@@ -34,7 +35,7 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
         for (var x = zona.x1; x <= zona.x2; x++) {
             let blancoDetected=false;
             for(var m=zona.y2-12; m<zona.y2;m++){
-                if(imagen.getPixelColor(x, m)> 0x1b1b1bff){
+                if(imagen.getPixelColor(x, m)> 0xf3e3e3ff){
                     blancoDetected=true;
                 }
             }
