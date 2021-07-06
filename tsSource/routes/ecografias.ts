@@ -76,6 +76,10 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
             }
         }
 
+        if(distanciasPx.length<1){
+            return res.status(400).send("Error analizando marcas de tiempo");
+        }
+
         console.log(`Distancias entre marcas de tiempo (Px): ${distanciasPx}`);
 
         const segundoPx = (distanciasPx.reduce((a, b) => a + b, 0) / distanciasPx.length) * 2;
