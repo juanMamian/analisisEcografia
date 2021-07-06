@@ -69,7 +69,11 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
         //Calcular relacion pixeles-tiempo:
         var distanciasPx: number[] = [];
         for (var j = 0; j < (marcasTiempo.length - 1); j++) {
-            distanciasPx.push(marcasTiempo[j + 1] - marcasTiempo[j]);
+            let estaDistancia=marcasTiempo[j + 1] - marcasTiempo[j];
+            distanciasPx.push(estaDistancia);
+            if(distanciasPx.length>0 && Math.abs(distanciasPx[distanciasPx.length-1]-estaDistancia)>5){
+                return res.status(400).send("Error analizando marcas de tiempo");
+            }
         }
 
         console.log(`Distancias entre marcas de tiempo (Px): ${distanciasPx}`);
@@ -91,7 +95,6 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
             for (var y = zona.y1; y <= zona.y2; y++) {
                 let colorPixel = imagen.getPixelColor(x, y);
                 if (colorPixel > umbralEco) { //Deteccion de un blanco                                                          
-                    console.log(`Deteccion de un punto de contorno al comparar ${colorPixel} con ${umbralEco}`);
                     linea.push(y - zona.y1);
                     break;
                 }

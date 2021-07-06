@@ -259,26 +259,28 @@ export default {
         this.respuestaRecibida=false;
         var fr = new FileReader();
         fr.onload = function () {
-          dis.$refs.imagenSeleccionada.src = fr.result;
-          dis.$nextTick(() => {
-            var anchoImagen = dis.$refs.imagenSeleccionada.offsetWidth;
-            var altoImagen = dis.$refs.imagenSeleccionada.offsetHeight;
-            console.log(`AnchoImagen: ${anchoImagen}`);
-            console.log(`AltoImagen: ${altoImagen}`);
-            dis.$set(dis.sizeImagenSeleccionada, "x", anchoImagen);
-            dis.$set(dis.sizeImagenSeleccionada, "y", altoImagen);
-            if(dis.posicionesZonaAnalisis.x2-dis.posicionesZonaAnalisis.x1==0 || dis.posicionesZonaAnalisis.y2-dis.posicionesZonaAnalisis.y1==0){
-              dis.posicionesZonaAnalisis = {
-                x1: 0,
-                y1: 0,
+          var imagen=new Image();
+          imagen.src= fr.result;
+          imagen.onload=function(){
+            console.log(`Size imágen: ${this.width}, ${this.height}`);
+            dis.$refs.imagenSeleccionada.src = fr.result;
+            dis.$nextTick(() => {
+              var anchoImagen = dis.$refs.imagenSeleccionada.offsetWidth;
+              var altoImagen = dis.$refs.imagenSeleccionada.offsetHeight;            
+              dis.$set(dis.sizeImagenSeleccionada, "x", anchoImagen);
+              dis.$set(dis.sizeImagenSeleccionada, "y", altoImagen);
+              if(dis.posicionesZonaAnalisis.x2-dis.posicionesZonaAnalisis.x1==0 || dis.posicionesZonaAnalisis.y2-dis.posicionesZonaAnalisis.y1==0){
+                dis.posicionesZonaAnalisis = {
+                  x1: 0,
+                  y1: 0,
 
-                x2: anchoImagen,
-                y2: altoImagen,
-              };            
-            }
-            dis.$set(dis.posicionesZonaAnalisis, "y2", altoImagen);
-            
-          });
+                  x2: anchoImagen,
+                  y2: altoImagen,
+                };            
+              }
+              dis.$set(dis.posicionesZonaAnalisis, "y2", altoImagen);            
+            });
+          };
         };
         fr.readAsDataURL(archivo);
       }
@@ -323,6 +325,9 @@ export default {
         .catch(function (error) {
           dis.enviandoEco = false;
           console.log(`Error analizando la ecografía. E: ${error}`);
+          if(error.response.data){
+            alert(error.response.data);
+          }
         });
     },
     trazarContornoEco(linea) {
