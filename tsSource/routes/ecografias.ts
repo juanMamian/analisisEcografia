@@ -22,7 +22,9 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
     const ecografia = req.file;
 
     const zona = JSON.parse(req.body.posicionesZonaAnalisis);
+    const umbralEco=parseInt(req.body.umbralEco.substr(1)+'ff', 16);
     console.log(`Analisis en ${JSON.stringify(zona)}`);
+    console.log(`Umbral: ${umbralEco}`);    
     Jimp.read(ecografia.buffer).then(async (imagen) => {
         var linea = [];
 
@@ -83,11 +85,13 @@ router.post("/analizarImagen", upload.single("ecografia"), async function (req: 
         var posiblePuntoQuiebre = 0;
         var recordAltura=0;
 
+        //Encontrar pixeles de contorno
         for (var x = zona.x1; x <= zona.x2; x++) {
             //Recorrido vertical de cada columna de pixeles
             for (var y = zona.y1; y <= zona.y2; y++) {
                 let colorPixel = imagen.getPixelColor(x, y);
-                if (colorPixel > 0x1b1b1bff) { //Deteccion de un blanco                                                          
+                if (colorPixel > umbralEco) { //Deteccion de un blanco                                                          
+                    console.log(`Deteccion de un punto de contorno al comparar ${colorPixel} con ${umbralEco}`);
                     linea.push(y - zona.y1);
                     break;
                 }

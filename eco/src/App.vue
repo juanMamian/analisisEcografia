@@ -113,6 +113,7 @@
           </div>
         </div>
         <br><br>
+      <input v-show="imagenSelected" type="color" v-model="umbralEco">
       <button v-show="imagenSelected" @click="uploadEcografia" ref="botonEnviarEco" id="botonEnviarEco" :class="{deshabilitado:enviandoEco}">Analizar</button>
 
       </center>
@@ -159,6 +160,9 @@ export default {
       resizingZonaAnalisis: [false, false, false, false],
       showContornoEco:true,
       showMarcasR:true,
+
+      umbralEco: "#1B1B1B"
+      // umbralEco: 0x1b1b1bff,
       
     };
   },
@@ -289,6 +293,7 @@ export default {
         "posicionesZonaAnalisis",
         JSON.stringify(this.posicionesZonaAnalisis)
       );
+      datos.append("umbralEco", this.umbralEco);
 
       this.enviandoEco = true;
       var dis = this;
